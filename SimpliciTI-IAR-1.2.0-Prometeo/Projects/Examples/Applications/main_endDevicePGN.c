@@ -190,15 +190,7 @@ static uint8_t sRxCallback(linkID_t port)
      
       /*  Process the received frame, which is only a 1-byte command...  */
       /*  Store this byte in the flag  */
-       //Funciona dpm
-       //if(msg[3] == GET_NODE_LIST){
-       //  toggleLED(1);
-       //  toggleLED(2); 
-       //  bcUartSend(msg, len);
-       //}
-       
-       processReceivedFrameRf(msg, len);
-       
+      processReceivedFrameRf(msg, len);       
       //Lo dejo, pero igual no haría falta
       sSemaphore = msg[0]+1;    
        
@@ -225,24 +217,24 @@ void processReceivedFrameRf(uint8_t * buf, uint8_t len)
         
       case RESPONSE_FRAME:
         
-        switch(buf[3])  // 4th byte corresponds to the 2nd byte of the code
-        {
+        //switch(buf[3])  // 4th byte corresponds to the 2nd byte of the code
+        //{
         // TO-DO: Implement all possible respond codes
-        case GET_NODE_LIST:
+        //case GET_NODE_LIST:
           // Send appropiate response 
               bcUartSend(buf, len);
               toggleLED(1);
               toggleLED(2);
           break;
-        case TOGGLE_LED:
+        //case TOGGLE_LED:
           // Send appropiate response
-          copy_buffer(tx_buf_bcuart, rsp_toggle_led, DEFAULT_RSP_TOGGLE_LED_LEN);
-          bcUartSend(tx_buf_bcuart, DEFAULT_RSP_TOGGLE_LED_LEN);
-          break;
-        default:
+          //copy_buffer(tx_buf_bcuart, rsp_toggle_led, DEFAULT_RSP_TOGGLE_LED_LEN);
+          //bcUartSend(tx_buf_bcuart, DEFAULT_RSP_TOGGLE_LED_LEN);
+          //break;
+        //default:
           // Do nothing
-          break;
-        }
+          //break;
+        //}
         
       case ACK_FRAME:
         // Do something
@@ -266,22 +258,7 @@ void processReceivedFrameUART(uint8_t * buf, uint8_t len)
       {
         
       case REQUEST_FRAME:
-        switch(buf[3])  // 4th byte corresponds to the 2nd byte of the code
-        {
-        // TO-DO: Implement all possible request codes
-        case GET_NODE_LIST:
-          
-          //copy_buffer(tx_buf_bcuart, rsp_get_node_list, DEFAULT_RSP_GET_NODE_LIST_LEN);
-          //bcUartSend(tx_buf_bcuart, DEFAULT_RSP_GET_NODE_LIST_LEN);
-          
-          // Send appropiate response by rf
-          //tx_buf_rf[0] = 0x03;
-          //tx_buf_rf[1] = sLinkID1;
-          //tx_buf_rf[2] = REQUEST_FRAME;
-          //tx_buf_rf[3] = GET_NODE_LIST;
-          //tx_buf_rf[4] = EOF_1;
-          //tx_buf_rf[5] = EOF_2;
-          
+       
           for (i = 0; i < len; i++){
             tx_buf_rf[i] = buf[i];
             contTX++;
@@ -291,16 +268,6 @@ void processReceivedFrameUART(uint8_t * buf, uint8_t len)
            toggleLED(1);
            toggleLED(2);
           break;
-          
-        case TOGGLE_LED:
-          // Send appropiate response
-          copy_buffer(tx_buf_bcuart, rsp_toggle_led, DEFAULT_RSP_TOGGLE_LED_LEN);
-          bcUartSend(tx_buf_bcuart, DEFAULT_RSP_TOGGLE_LED_LEN);
-          break;
-        default:
-          // Do nothing
-          break;
-        }
         
       case ACK_FRAME:
         // Do something
