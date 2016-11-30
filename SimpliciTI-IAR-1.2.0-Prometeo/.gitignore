@@ -1,0 +1,7 @@
+*.d43
+*.dep
+*.map
+settings/
+Obj/
+Exe/
+path.txt

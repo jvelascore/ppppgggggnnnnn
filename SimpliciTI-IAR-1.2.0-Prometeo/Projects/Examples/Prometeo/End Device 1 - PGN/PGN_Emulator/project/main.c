@@ -1,0 +1,172 @@
+/* --COPYRIGHT--,BSD
+ * Copyright (c) 2012, Texas Instruments Incorporated
+ * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ *
+ * *  Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ *
+ * *  Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ *
+ * *  Neither the name of Texas Instruments Incorporated nor the names of
+ *    its contributors may be used to endorse or promote products derived
+ *    from this software without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+ * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO,
+ * THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
+ * PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR
+ * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
+ * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+ * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS;
+ * OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
+ * WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR
+ * OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE,
+ * EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ * --/COPYRIGHT--*/
+//******************************************************************************
+//   MSP430F5529LP:  simpleUsbBackchannel example
+//
+//   Description: 	Demonstrates simple sending over USB, as well as the F5529's
+//                  backchannel UART.
+//
+//   Texas Instruments Inc.
+//   August 2013
+//******************************************************************************
+
+// Basic MSP430 and driverLib #includes
+#include "msp430.h"
+#include "driverlib/MSP430F5xx_6xx/wdt_a.h"
+#include "driverlib/MSP430F5xx_6xx/ucs.h"
+#include "driverlib/MSP430F5xx_6xx/pmm.h"
+#include "driverlib/MSP430F5xx_6xx/sfr.h"
+
+#include "types.h"
+
+// Application #includes
+#include "BCUart.h"           // Include the backchannel UART "library"
+#include "hal.h"              // Modify hal.h to select your hardware
+#include "PGN_protocol.h"     // PGN protocol codes and defines
+
+
+/* You have a choice between implementing this as a CDC USB device, or a HID-
+ * Datapipe device.  With CDC, the USB device presents a COM port on the host;
+ * you interact with it with a terminal application, like Hyperterminal or
+ * Docklight.  With HID-Datapipe, you interact with it using the Java HID Demo
+ * App available within the MSP430 USB Developers Package.
+ *
+ * By default, this app uses CDC.  The HID calls are included, but commented
+ * out.
+ *
+ * See the F5529 LaunchPad User's Guide for simple instructions to convert
+ * this demo to HID-Datapipe.  For deeper information on CDC and HID-Datapipe,
+ * see the USB API Programmer's Guide in the USB Developers Package.
+ */
+
+// Prototypes
+void processReceivedFrame(uint8_t * buf, uint8_t len);
+void *copy_buffer( void *dst, const void *src, UINT len );
+
+// Hardcoded responses
+const BYTE rsp_get_node_list[DEFAULT_RSP_GET_NODE_LIST_LEN] = DEFAULT_RSP_GET_NODE_LIST;
+const BYTE rsp_toggle_led[DEFAULT_RSP_TOGGLE_LED_LEN] = DEFAULT_RSP_TOGGLE_LED;
+
+// Global variables
+WORD rxByteCount;                        // Momentarily stores the number of bytes received
+BYTE rx_buf_bcuart[BC_RXBUF_SIZE];       // Same size as the UART's rcv buffer
+BYTE tx_buf_bcuart[BC_RXBUF_SIZE];       
+
+
+void main(void)
+{
+    WDTCTL = WDTPW + WDTHOLD;		// Halt the dog, detener el perro
+
+    // MSP430 USB requires a Vcore setting of at least 2.  2 is high enough
+	// for 8MHz MCLK, below.
+    PMM_setVCore(PMM_BASE, PMM_CORE_LEVEL_2);
+
+    initPorts();           // Config all the GPIOS for low-power (output low)
+    initClocks(8000000);   // Config clocks. MCLK=SMCLK=FLL=8MHz; ACLK=REFO=32kHz
+    //bcUartInitLaunchpad();   // Init the back-channel UART for F5529 launchpad (9600 bps).
+    bcUartInitPGN();        // Init the back-channel UART for PGN (9600 bps).
+    __enable_interrupt();  // Enable interrupts globally
+
+    while(1)
+    {
+       // Look for rcv'ed command on the backchannel UART. If any, process.
+       rxByteCount = bcUartReadCommandTimeout(rx_buf_bcuart);
+       if(rxByteCount != -1)
+       {
+         processReceivedFrame(rx_buf_bcuart, rxByteCount);
+       }
+       else // Timeout
+       {
+         // Do other things
+         tx_buf_bcuart[0] = 0xCC;
+         tx_buf_bcuart[1] = 0xDD;
+         bcUartSend(tx_buf_bcuart, 2);
+       }
+    }
+}
+
+// Process received frame and send the appropiate answer
+void processReceivedFrame(uint8_t * buf, uint8_t len)
+{
+    // 1st byte is the length not counting the two bytes of the EOF and
+    // the length byte itself. Check
+    if (buf[0] == len-3)
+    {
+      switch(buf[2])  // 3rd byte corresponds to the 1st byte of the code
+      {
+        
+      case REQUEST_FRAME:
+        switch(buf[3])  // 4th byte corresponds to the 2nd byte of the code
+        {
+        // TO-DO: Implement all possible request codes
+        case GET_NODE_LIST:
+          // Send appropiate response
+          copy_buffer(tx_buf_bcuart, rsp_get_node_list, DEFAULT_RSP_GET_NODE_LIST_LEN);
+          bcUartSend(tx_buf_bcuart, DEFAULT_RSP_GET_NODE_LIST_LEN);
+          break;
+        case TOGGLE_LED:
+          // Send appropiate response
+          copy_buffer(tx_buf_bcuart, rsp_toggle_led, DEFAULT_RSP_TOGGLE_LED_LEN);
+          bcUartSend(tx_buf_bcuart, DEFAULT_RSP_TOGGLE_LED_LEN);
+          break;
+        default:
+          // Do nothing
+          break;
+        }
+        
+      case ACK_FRAME:
+        // Do something
+        break;
+        
+      default:
+        // Do nothing
+        break;
+      }
+    }
+}
+          
+  
+// Auxiliary function to copy the content of a buffer into another
+void *copy_buffer( void *dst, const void *src, UINT len )
+{
+  BYTE *pDst;
+  const BYTE *pSrc;
+
+  pSrc = src;
+  pDst = dst;
+
+  while ( len-- )
+    *pDst++ = *pSrc++;
+
+  return ( pDst );
+}
+
