@@ -2,7 +2,7 @@
 //   MSP430F5529LP:  simpleUsbBackchannel example
 //
 //   Description: 	Demonstrates simple sending over USB, as well as the F5529's
-//                  backchannel UART.
+//                      backchannel UART.
 //
 //   Texas Instruments Inc.
 //   August 2013
@@ -44,6 +44,8 @@ BYTE rx_buf_rf[BC_RXBUF_SIZE];
 BYTE tx_buf_rf[BC_RXBUF_SIZE];
 BYTE ID_red[BC_RXBUF_SIZE];
 
+static uint8_t  numNodeRed = 0;
+static uint8_t IDsRed[NUM_CONNECTIONS] = {0};
 /*----------------------------------------------------------------------------
  *  Demo Application for SimpliciTI
  *
@@ -208,10 +210,7 @@ static uint8_t sRxCallback(linkID_t port)
 // Process received frame from radio and send the appropiate answer
 void processReceivedFrameRf(uint8_t * buf, uint8_t len)
 {    uint8_t i;
-    // 1st byte is the length not counting the two bytes of the EOF and
-    // the length byte itself. Check
-    //if (buf[0] == len-3)
-    //{
+
       switch(buf[2])  // 3rd byte corresponds to the 1st byte of the code
       {
         
@@ -219,13 +218,18 @@ void processReceivedFrameRf(uint8_t * buf, uint8_t len)
         
         //switch(buf[3])  // 4th byte corresponds to the 2nd byte of the code
         //{
-        // TO-DO: Implement all possible respond codes
+        
         //case GET_NODE_LIST:
-          // Send appropiate response 
+        //      numNodeRed = buf[4];
+        //      for (i = 5; i < (5+numNodeRed); i++){
+        //      IDsRed[i-5] = buf[i];
+        //      }
+          //    bcUartSend(IDsRed, sizeof(IDsRed));
+          // Send appropiate response   
               bcUartSend(buf, len);
-              toggleLED(1);
-              toggleLED(2);
-          break;
+        //      toggleLED(1);
+        //      toggleLED(2);
+        //  break;
         //case TOGGLE_LED:
           // Send appropiate response
           //copy_buffer(tx_buf_bcuart, rsp_toggle_led, DEFAULT_RSP_TOGGLE_LED_LEN);
@@ -235,6 +239,10 @@ void processReceivedFrameRf(uint8_t * buf, uint8_t len)
           // Do nothing
           //break;
         //}
+        
+      //case EOF_2:
+      //  bcUartSend(buf, len);
+      //  break;  
         
       case ACK_FRAME:
         // Do something
